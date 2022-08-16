@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1
-
-FROM golang:1.16-alpine
+FROM golang:1.17-alpine
 
 WORKDIR /app
 
@@ -11,8 +10,10 @@ RUN go mod download
 
 COPY *.go ./
 
-RUN go build -o /pb-api
+RUN go mod tidy
+
+RUN go build -o github.com/abdullahkhan9375/portfolio-blog-api
 
 EXPOSE 8080
 
-CMD [ "/pb-api" ]
+CMD [ "/github.com/abdullahkhan9375/portfolio-blog-api" ]
