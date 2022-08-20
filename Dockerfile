@@ -1,19 +1,20 @@
-# syntax=docker/dockerfile:1
 FROM golang:1.17-alpine
 
-WORKDIR /app
+RUN apk add --no-cache git
+WORKDIR /app/portfolio-blog-api
 
-COPY go.mod ./
-COPY go.sum ./
+COPY go.mod .
+COPY go.sum .
 
 RUN go mod download
 
-COPY *.go ./
+COPY . .
 
-RUN go mod tidy
+# Build the Go app
+RUN go build -o ./out/portfolio-blog-api .
 
-RUN go build -o github.com/abdullahkhan9375/portfolio-blog-api
-
+# This container exposes port 8080 to the outside world
 EXPOSE 8080
 
-CMD [ "/github.com/abdullahkhan9375/portfolio-blog-api" ]
+# Run the binary program produced by `go install`
+CMD ["./out/portfolio-blog-api"]

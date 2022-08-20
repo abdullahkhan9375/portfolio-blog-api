@@ -1,10 +1,17 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 var PAGINATION_LIMIT int8 = 4
@@ -39,47 +46,12 @@ type Project struct {
 }
 
 type WorkExperience struct {
-	Company          string   `json:"company"`
-	Position         string   `json:"position"`
-	Responsibilities []string `json:"description"`
-	FromDate         string   `json:"fromDate"`
-	ToDate           string   `json:"toDate"`
-}
-
-var lWorkExperiences = []WorkExperience{
-	{
-		Company:  "Proxima Capital",
-		Position: "Junior SWE",
-		Responsibilities: []string{
-			"Worked on PAS.",
-			"Enjoyed free lunches.",
-			"Had a lot of fun.",
-		},
-		FromDate: "2022/01/04",
-		ToDate:   "Present",
-	},
-	{
-		Company:  "EY",
-		Position: "PACE Developer",
-		Responsibilities: []string{
-			"Worked on Maskforce.",
-			"Had a lot of fun.",
-			"I was also a team lead.",
-		},
-		FromDate: "2021/06/01",
-		ToDate:   "2021/12/10",
-	},
-	{
-		Company:  "Hearing Power",
-		Position: "Data Intern",
-		Responsibilities: []string{
-			"Worked on Tinnibot.",
-			"Had a lot of fun.",
-			"Enjoyed working from home.",
-		},
-		FromDate: "2021/01/01",
-		ToDate:   "2021/05/01",
-	},
+	WorkId         int
+	CompanyName    string   `json:"company"`
+	Position       string   `json:"position"`
+	Responsibities []string `json:"responsibility"`
+	FromDate       string   `json:"fromDate"`
+	ToDate         string   `json:"toDate"`
 }
 
 var lBlogPreviews = []BlogPreview{
@@ -297,14 +269,50 @@ func getProjects(aContext *gin.Context) {
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
-func getWorkExperience(aContext *gin.Context) {
-	//TODO: use aContext.JSON in prod. IndentedJSON is CPU intensive.
+func getWorkExperience(aContext *gin.Context, aDB *sql.DB) {
+	lRows, err := aDB.Query("SELECT * FROM workexperience")
+	if err != nil {
+		log.Fatalf("An error occured") // TODO: Add error handling.
+	}
 
+	defer lRows.Close()
+
+	lWorkExperiences := make([]WorkExperience, 0)
+
+	for lRows.Next() {
+		var workId int
+		var companyName string
+		var position string
+		var responsibility1 string
+		var responsibility2 string
+		var responsibility3 string
+		var fromDate string
+		var toDate string
+
+		lRows.Scan(
+			&workId,
+			&companyName,
+			&position,
+			&responsibility1,
+			&responsibility2,
+			&responsibility3,
+			&fromDate,
+			&toDate,
+		)
+		fmt.Println(workId, companyName, position)
+		lWorkExperiences = append(lWorkExperiences, WorkExperience{
+			WorkId:         workId,
+			CompanyName:    companyName,
+			Position:       position,
+			Responsibities: []string{responsibility1, responsibility2, responsibility3},
+			FromDate:       fromDate,
+			ToDate:         toDate,
+		})
+	}
 	var lResponse ServerResponse = ServerResponse{
 		Message: "Cool",
 		Data:    lWorkExperiences,
 	}
-
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
@@ -313,11 +321,44 @@ func main() {
 	// if port == "" {
 	// 	log.Fatal("$PORT must be set")
 	// }
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
+	lPostGresUserName := os.Getenv("POSTGRES_USERNAME")
+	lPostGresPassword := os.Getenv("POSTGRES_PASSWORD")
+	lPostGresPORT, _ := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
+	lPostGresHost := os.Getenv("POSTGRES_HOST")
+	lPostGresDB := os.Getenv("POSTGRES_DB")
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		lPostGresHost, lPostGresPORT, lPostGresUserName, lPostGresPassword, lPostGresDB)
+
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Successfully connected!")
 
 	lRouter := gin.New()
 	lRouter.Use(gin.Logger())
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	lRouter.Use(cors.New(config))
 
-	lRouter.GET("/work", getWorkExperience)
+	lRouter.GET("/work", func(aContext *gin.Context) {
+		getWorkExperience(aContext, db)
+	})
+
 	lRouter.GET("/projects", getProjects)
 
 	// GET Paginated blog previews.
