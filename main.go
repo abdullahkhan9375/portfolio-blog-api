@@ -17,13 +17,14 @@ import (
 var PAGINATION_LIMIT int8 = 4
 
 type BlogPreview struct {
-	Id          string   `json:"blogId"`
+	Id          int      `json:"blogId"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Keywords    []string `json:"keywords"`
 	Genre       string   `json:"genre"`
 	Date        string   `json:"date"`
 	TimeToRead  int8     `json:"timeToRead"`
+	BlogId      int8     `json:"blogPostId"`
 }
 
 type Tlink struct {
@@ -37,7 +38,7 @@ type ServerResponse struct {
 }
 
 type Project struct {
-	Id          string   `json:"id"`
+	Id          int      `json:"id"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Features    []string `json:"features"`
@@ -54,159 +55,6 @@ type WorkExperience struct {
 	ToDate         string   `json:"toDate"`
 }
 
-var lBlogPreviews = []BlogPreview{
-	{
-		Id:          "post-1",
-		Name:        "Post 1",
-		Description: "The first blog post I have ever written wow.",
-		Keywords:    []string{"cool", "first blog"},
-		Genre:       "Opinion",
-		Date:        "2022-01-01",
-		TimeToRead:  5,
-	},
-	{
-		Id:          "post-2",
-		Name:        "Post 2",
-		Description: "The second blog post I have ever written wow.",
-		Keywords:    []string{"cool", "second blog"},
-		Genre:       "Story",
-		Date:        "2022-03-01",
-		TimeToRead:  10,
-	},
-	{
-		Id:          "post-3",
-		Name:        "Post 3",
-		Description: "The third blog post I have ever written wow.",
-		Keywords:    []string{"strange", "cool"},
-		Genre:       "Article",
-		Date:        "2022-05-01",
-		TimeToRead:  15,
-	},
-	{
-		Id:          "post-4",
-		Name:        "Post 4",
-		Description: "The fourth blog post I have ever written wow.",
-		Keywords:    []string{"strange", "cool"},
-		Genre:       "Article",
-		Date:        "2022-05-01",
-		TimeToRead:  15,
-	},
-	{
-		Id:          "post-5",
-		Name:        "Post 1",
-		Description: "The first blog post I have ever written wow.",
-		Keywords:    []string{"cool", "first blog"},
-		Genre:       "Opinion",
-		Date:        "2022-01-01",
-		TimeToRead:  5,
-	},
-	{
-		Id:          "post-6",
-		Name:        "Post 2",
-		Description: "The second blog post I have ever written wow.",
-		Keywords:    []string{"cool", "second blog"},
-		Genre:       "Story",
-		Date:        "2022-03-01",
-		TimeToRead:  10,
-	},
-	{
-		Id:          "post-7",
-		Name:        "Post 3",
-		Description: "The third blog post I have ever written wow.",
-		Keywords:    []string{"strange", "cool"},
-		Genre:       "Article",
-		Date:        "2022-05-01",
-		TimeToRead:  15,
-	},
-	{
-		Id:          "post-8",
-		Name:        "Post 4",
-		Description: "The fourth blog post I have ever written wow.",
-		Keywords:    []string{"strange", "cool"},
-		Genre:       "Article",
-		Date:        "2022-05-01",
-		TimeToRead:  15,
-	},
-	{
-		Id:          "post-9",
-		Name:        "Post 4",
-		Description: "The fourth blog post I have ever written wow.",
-		Keywords:    []string{"strange", "cool"},
-		Genre:       "Article",
-		Date:        "2022-05-01",
-		TimeToRead:  15,
-	},
-}
-
-var lProjects = []Project{
-	{
-		Id:          "Project-1",
-		Name:        "Notemaking App",
-		Description: "Self-explanatory title",
-		Features: []string{
-			"React front-end",
-			"Randomized backgrounds from Unsplash",
-			"Mobile responsive",
-		},
-		TechStack: []string{
-			"React",
-			"Netlify",
-			"CSS",
-		},
-		Links: &[]Tlink{
-			{
-				Name: "Github",
-				Link: "https://github.com/abdullahkhan9375/Notemaker",
-			},
-		},
-	},
-	{
-		Id:          "Project-2",
-		Name:        "Breaking Bad Quiz",
-		Description: "Can you make pure meth?",
-		Features: []string{
-			"React front-end",
-			"Fetch API to grab images from an open-source API",
-			"Mobile responsive",
-		},
-		TechStack: []string{
-			"React",
-			"Netlify",
-			"CSS",
-		},
-		Links: &[]Tlink{
-			{
-				Name: "Github",
-				Link: "https://github.com/abdullahkhan9375/breakingbadquiz",
-			},
-			{
-				Name: "Website",
-				Link: "https://breakingbadquiz.netlify.com",
-			},
-		},
-	},
-	{
-		Id:          "Project-3",
-		Name:        "Google Apps vs Apple Apps",
-		Description: "An appstore comparison",
-		Features: []string{
-			"Exploratory Data analysis that tells a story",
-			"Cutting edge python visualization libraries.",
-			"Hosted on and powered by Kaggle.",
-		},
-		TechStack: []string{
-			"Plotly",
-			"Python",
-		},
-		Links: &[]Tlink{
-			{
-				Name: "Github",
-				Link: "https://github.com/abdullahkhan9375/GooglePlaystore-vs-AppleAppstore",
-			},
-		},
-	},
-}
-
 func min(a int8, b int8) int8 {
 	if a < b {
 		return a
@@ -220,19 +68,61 @@ func paginatedPayload(aPayload []BlogPreview, pageNumber int8) []BlogPreview {
 	var lEndEntry int8 = PAGINATION_LIMIT * pageNumber //12
 	var lStartEntry int8 = lEndEntry - PAGINATION_LIMIT
 	var lCopyIndex int8 = 0
-	var lEndIndex = min(lEndEntry, int8(len(lBlogPreviews)))
+	var lEndIndex = min(lEndEntry, int8(len(aPayload)))
 	for lIndex := lStartEntry; lIndex < lEndIndex; lIndex++ {
-		lBlogEntry := aPayload[lIndex]
-		if lBlogEntry.Id != "" {
-			lPaginatedBlogPreviews[lCopyIndex] = aPayload[lIndex]
-		}
+		lPaginatedBlogPreviews[lCopyIndex] = aPayload[lIndex]
 		lCopyIndex++
 	}
 	return lPaginatedBlogPreviews
 }
 
-func getBlogPreviews(aContext *gin.Context) {
+func getBlogPreviews(aContext *gin.Context, aDB *sql.DB) {
 	pageNumber, err := strconv.Atoi(aContext.Param("page"))
+
+	lRows, err := aDB.Query("SELECT * FROM blogPreview")
+	if err != nil {
+		log.Fatalf("An error occured") // TODO: Add error handling.
+	}
+
+	defer lRows.Close()
+
+	lBlogPreviews := make([]BlogPreview, 0)
+
+	for lRows.Next() {
+		var blogId int
+		var blogName string
+		var blogDesc string
+		var blogKeyword1 string
+		var blogKeyword2 string
+		var blogKeyword3 string
+		var blogGenre string
+		var blogDateCreated string
+		var blogTimeToRead int
+		var blogPostId int
+
+		lRows.Scan(
+			&blogId,
+			&blogName,
+			&blogDesc,
+			&blogKeyword1,
+			&blogKeyword2,
+			&blogKeyword3,
+			&blogGenre,
+			&blogDateCreated,
+			&blogTimeToRead,
+			&blogPostId,
+		)
+		lBlogPreviews = append(lBlogPreviews, BlogPreview{
+			Id:          blogId,
+			Name:        blogName,
+			Description: blogDesc,
+			Keywords:    []string{blogKeyword1, blogKeyword2, blogKeyword3},
+			Genre:       blogGenre,
+			Date:        blogDateCreated,
+			TimeToRead:  int8(blogTimeToRead),
+			BlogId:      int8(blogPostId),
+		})
+	}
 
 	if err != nil {
 		var lResponse = ServerResponse{
@@ -261,11 +151,56 @@ func getBlogPreviews(aContext *gin.Context) {
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
-func getProjects(aContext *gin.Context) {
+func getProjects(aContext *gin.Context, aDB *sql.DB) {
+	lRows, err := aDB.Query("SELECT * FROM project")
+	if err != nil {
+		log.Fatalf("An error occured") // TODO: Add error handling.
+	}
+
+	defer lRows.Close()
+
+	lProjects := make([]Project, 0)
+
+	for lRows.Next() {
+		var projectId int
+		var projectName string
+		var projectDescription string
+		var projectFeature1 string
+		var projectFeature2 string
+		var projectFeature3 string
+		var projectGithub string
+		var projectWebsite string
+
+		lRows.Scan(
+			&projectId,
+			&projectName,
+			&projectDescription,
+			&projectFeature1,
+			&projectFeature2,
+			&projectFeature3,
+			&projectGithub,
+			&projectWebsite,
+		)
+		lProjects = append(lProjects, Project{
+			Id:          projectId,
+			Name:        projectName,
+			Description: projectDescription,
+			Features:    []string{projectFeature1, projectFeature2, projectFeature3},
+			Links: &[]Tlink{{
+				Name: "Github",
+				Link: projectGithub,
+			},
+				{
+					Name: "Website",
+					Link: projectWebsite,
+				}},
+		})
+	}
 	var lResponse ServerResponse = ServerResponse{
 		Message: "Cool",
 		Data:    lProjects,
 	}
+
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
@@ -318,9 +253,6 @@ func getWorkExperience(aContext *gin.Context, aDB *sql.DB) {
 
 func main() {
 
-	// if port == "" {
-	// 	log.Fatal("$PORT must be set")
-	// }
 	err := godotenv.Load(".env")
 
 	if err != nil {
@@ -338,6 +270,7 @@ func main() {
 		lPostGresHost, lPostGresPORT, lPostGresUserName, lPostGresPassword, lPostGresDB)
 
 	db, err := sql.Open("postgres", psqlInfo)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -359,10 +292,14 @@ func main() {
 		getWorkExperience(aContext, db)
 	})
 
-	lRouter.GET("/projects", getProjects)
+	lRouter.GET("/projects", func(aContext *gin.Context) {
+		getProjects(aContext, db)
+	})
 
 	// GET Paginated blog previews.
-	lRouter.GET("/blogpreviews/:page", getBlogPreviews)
+	lRouter.GET("/blogpreviews/:page", func(aContext *gin.Context) {
+		getBlogPreviews(aContext, db)
+	})
 
 	lRouter.Run(":8080")
 }
