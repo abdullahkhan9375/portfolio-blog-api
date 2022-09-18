@@ -1,30 +1,29 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
+	"cloud.google.com/go/firestore"
+	firebase "firebase.google.com/go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 var PAGINATION_LIMIT int8 = 4
 
 type BlogPreview struct {
-	Id          int      `json:"blogId"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Keywords    []string `json:"keywords"`
-	Genre       string   `json:"genre"`
-	Date        string   `json:"date"`
-	TimeToRead  int8     `json:"timeToRead"`
-	BlogId      int8     `json:"blogPostId"`
+	Name        string   `firestore:"name"`
+	Description string   `firestore:"desc"`
+	Keywords    []string `firestore:"keywords"`
+	Genre       string   `firestore:"genre"`
+	Date        string   `firestore:"dateCreated"`
+	TimeToRead  int8     `firestore:"timeToRead"`
+	PostId      int8     `firestore:"postId"`
 }
 
 type Tlink struct {
@@ -38,21 +37,19 @@ type ServerResponse struct {
 }
 
 type Project struct {
-	Id          int      `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Features    []string `json:"features"`
-	TechStack   []string `json:"techStack"`
-	Links       *[]Tlink `json:"links"`
+	Name        string   `firestore:"name"`
+	Description string   `firestore:"description"`
+	Features    []string `firestore:"features"`
+	Github      string   `firestore:"github"`
+	Website     string   `firestore:"website"`
 }
 
 type WorkExperience struct {
-	WorkId         int
-	CompanyName    string   `json:"company"`
-	Position       string   `json:"position"`
-	Responsibities []string `json:"responsibility"`
-	FromDate       string   `json:"fromDate"`
-	ToDate         string   `json:"toDate"`
+	Name           string   `firestore:"name"`
+	Position       string   `firestore:"position"`
+	Responsibities []string `firestore:"responsibilities"`
+	FromDate       string   `firestore:"fromDate"`
+	ToDate         string   `firestore:"toDate"`
 }
 
 func min(a int8, b int8) int8 {
@@ -62,7 +59,6 @@ func min(a int8, b int8) int8 {
 	return b
 }
 
-// TODO: Find a good way to paginate the last few entries.
 func paginatedPayload(aPayload []BlogPreview, pageNumber int8) []BlogPreview {
 	lPaginatedBlogPreviews := make([]BlogPreview, PAGINATION_LIMIT)
 	var lEndEntry int8 = PAGINATION_LIMIT * pageNumber //12
@@ -76,52 +72,23 @@ func paginatedPayload(aPayload []BlogPreview, pageNumber int8) []BlogPreview {
 	return lPaginatedBlogPreviews
 }
 
-func getBlogPreviews(aContext *gin.Context, aDB *sql.DB) {
+func getBlogPreviews(aContext *gin.Context, aFireStore *firestore.Client, ctx context.Context) {
 	pageNumber, err := strconv.Atoi(aContext.Param("page"))
 
-	lRows, err := aDB.Query("SELECT * FROM blogPreview")
+	lDocuments, err := aFireStore.Collection("blogPreviews").DocumentRefs(ctx).GetAll()
 	if err != nil {
-		log.Fatalf("An error occured") // TODO: Add error handling.
+		log.Fatalf("An error occured")
 	}
 
-	defer lRows.Close()
+	var lBlogPrev BlogPreview = BlogPreview{}
+	var lData []BlogPreview = []BlogPreview{}
 
-	lBlogPreviews := make([]BlogPreview, 0)
-
-	for lRows.Next() {
-		var blogId int
-		var blogName string
-		var blogDesc string
-		var blogKeyword1 string
-		var blogKeyword2 string
-		var blogKeyword3 string
-		var blogGenre string
-		var blogDateCreated string
-		var blogTimeToRead int
-		var blogPostId int
-
-		lRows.Scan(
-			&blogId,
-			&blogName,
-			&blogDesc,
-			&blogKeyword1,
-			&blogKeyword2,
-			&blogKeyword3,
-			&blogGenre,
-			&blogDateCreated,
-			&blogTimeToRead,
-			&blogPostId,
-		)
-		lBlogPreviews = append(lBlogPreviews, BlogPreview{
-			Id:          blogId,
-			Name:        blogName,
-			Description: blogDesc,
-			Keywords:    []string{blogKeyword1, blogKeyword2, blogKeyword3},
-			Genre:       blogGenre,
-			Date:        blogDateCreated,
-			TimeToRead:  int8(blogTimeToRead),
-			BlogId:      int8(blogPostId),
-		})
+	for _, lDocument := range lDocuments {
+		lDatum, _ := lDocument.Get(ctx)
+		if err := lDatum.DataTo(&lBlogPrev); err != nil {
+			fmt.Println(err)
+		}
+		lData = append(lData, lBlogPrev)
 	}
 
 	if err != nil {
@@ -134,7 +101,7 @@ func getBlogPreviews(aContext *gin.Context, aDB *sql.DB) {
 	}
 
 	var lPaginationEnd = PAGINATION_LIMIT * int8(pageNumber)
-	if lPaginationEnd > int8(len(lBlogPreviews)+4) {
+	if lPaginationEnd > int8(len(lData)+4) {
 		var lResponse = ServerResponse{
 			Message: "Page does not exist.",
 			Data:    []string{},
@@ -145,142 +112,73 @@ func getBlogPreviews(aContext *gin.Context, aDB *sql.DB) {
 
 	var lResponse = ServerResponse{
 		Message: "Cool",
-		Data:    paginatedPayload(lBlogPreviews, int8(pageNumber)),
+		Data:    paginatedPayload(lData, int8(pageNumber)),
 	}
 
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
-func getProjects(aContext *gin.Context, aDB *sql.DB) {
-	lRows, err := aDB.Query("SELECT * FROM project")
+func getProjects(aContext *gin.Context, aFireStore *firestore.Client, ctx context.Context) {
+
+	lDocuments, err := aFireStore.Collection("projects").DocumentRefs(ctx).GetAll()
 	if err != nil {
 		log.Fatalf("An error occured") // TODO: Add error handling.
 	}
 
-	defer lRows.Close()
+	var lProj Project = Project{}
+	var lData []Project = []Project{}
 
-	lProjects := make([]Project, 0)
-
-	for lRows.Next() {
-		var projectId int
-		var projectName string
-		var projectDescription string
-		var projectFeature1 string
-		var projectFeature2 string
-		var projectFeature3 string
-		var projectGithub string
-		var projectWebsite string
-
-		lRows.Scan(
-			&projectId,
-			&projectName,
-			&projectDescription,
-			&projectFeature1,
-			&projectFeature2,
-			&projectFeature3,
-			&projectGithub,
-			&projectWebsite,
-		)
-		lProjects = append(lProjects, Project{
-			Id:          projectId,
-			Name:        projectName,
-			Description: projectDescription,
-			Features:    []string{projectFeature1, projectFeature2, projectFeature3},
-			Links: &[]Tlink{{
-				Name: "Github",
-				Link: projectGithub,
-			},
-				{
-					Name: "Website",
-					Link: projectWebsite,
-				}},
-		})
+	for _, lDocument := range lDocuments {
+		lDatum, _ := lDocument.Get(ctx)
+		if err := lDatum.DataTo(&lProj); err != nil {
+			fmt.Println(err)
+		}
+		lData = append(lData, lProj)
 	}
 	var lResponse ServerResponse = ServerResponse{
 		Message: "Cool",
-		Data:    lProjects,
+		Data:    lData,
 	}
 
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
-func getWorkExperience(aContext *gin.Context, aDB *sql.DB) {
-	lRows, err := aDB.Query("SELECT * FROM workexperience")
+func getWorkExperience(aContext *gin.Context, aFireStore *firestore.Client, ctx context.Context) {
+
+	lDocuments, err := aFireStore.Collection("workExperience").DocumentRefs(ctx).GetAll()
 	if err != nil {
 		log.Fatalf("An error occured") // TODO: Add error handling.
 	}
 
-	defer lRows.Close()
+	var lWorkExp WorkExperience = WorkExperience{}
+	var lData []WorkExperience = []WorkExperience{}
 
-	lWorkExperiences := make([]WorkExperience, 0)
-
-	for lRows.Next() {
-		var workId int
-		var companyName string
-		var position string
-		var responsibility1 string
-		var responsibility2 string
-		var responsibility3 string
-		var fromDate string
-		var toDate string
-
-		lRows.Scan(
-			&workId,
-			&companyName,
-			&position,
-			&responsibility1,
-			&responsibility2,
-			&responsibility3,
-			&fromDate,
-			&toDate,
-		)
-		fmt.Println(workId, companyName, position)
-		lWorkExperiences = append(lWorkExperiences, WorkExperience{
-			WorkId:         workId,
-			CompanyName:    companyName,
-			Position:       position,
-			Responsibities: []string{responsibility1, responsibility2, responsibility3},
-			FromDate:       fromDate,
-			ToDate:         toDate,
-		})
+	for _, lDocument := range lDocuments {
+		lDatum, _ := lDocument.Get(ctx)
+		if err := lDatum.DataTo(&lWorkExp); err != nil {
+			fmt.Println(err)
+		}
+		lData = append(lData, lWorkExp)
 	}
 	var lResponse ServerResponse = ServerResponse{
 		Message: "Cool",
-		Data:    lWorkExperiences,
+		Data:    lData,
 	}
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
 func main() {
-
-	err := godotenv.Load(".env")
-
+	ctx := context.Background()
+	app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
-		log.Fatalf("Error loading .env file")
+		log.Fatalf("error initializing app: %v\n", err)
 	}
 
-	lPostGresUserName := os.Getenv("POSTGRES_USERNAME")
-	lPostGresPassword := os.Getenv("POSTGRES_PASSWORD")
-	lPostGresPORT, _ := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
-	lPostGresHost := os.Getenv("POSTGRES_HOST")
-	lPostGresDB := os.Getenv("POSTGRES_DB")
-
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		lPostGresHost, lPostGresPORT, lPostGresUserName, lPostGresPassword, lPostGresDB)
-
-	db, err := sql.Open("postgres", psqlInfo)
+	lFirestoreClient, err := app.Firestore(ctx)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("error instantiating a firestore var")
 	}
-	defer db.Close()
-	err = db.Ping()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Successfully connected!")
 
 	lRouter := gin.New()
 	lRouter.Use(gin.Logger())
@@ -289,16 +187,15 @@ func main() {
 	lRouter.Use(cors.New(config))
 
 	lRouter.GET("/work", func(aContext *gin.Context) {
-		getWorkExperience(aContext, db)
+		getWorkExperience(aContext, lFirestoreClient, ctx)
 	})
 
 	lRouter.GET("/projects", func(aContext *gin.Context) {
-		getProjects(aContext, db)
+		getProjects(aContext, lFirestoreClient, ctx)
 	})
 
-	// GET Paginated blog previews.
 	lRouter.GET("/blogpreviews/:page", func(aContext *gin.Context) {
-		getBlogPreviews(aContext, db)
+		getBlogPreviews(aContext, lFirestoreClient, ctx)
 	})
 
 	lRouter.Run(":8080")
