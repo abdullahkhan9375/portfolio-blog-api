@@ -5,6 +5,7 @@ WORKDIR /app/portfolio-blog-api
 
 COPY go.mod .
 COPY go.sum .
+COPY portfolio-blog-api-key.json .
 
 RUN go mod download
 

@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"google.golang.org/api/option"
 )
 
 var PAGINATION_LIMIT int8 = 4
@@ -139,7 +140,6 @@ func getProjects(aContext *gin.Context, aFireStore *firestore.Client, ctx contex
 		Message: "Cool",
 		Data:    lData,
 	}
-
 	aContext.IndentedJSON(http.StatusOK, lResponse)
 }
 
@@ -169,7 +169,8 @@ func getWorkExperience(aContext *gin.Context, aFireStore *firestore.Client, ctx 
 
 func main() {
 	ctx := context.Background()
-	app, err := firebase.NewApp(ctx, nil)
+	sa := option.WithCredentialsFile("portfolio-blog-api-key.json")
+	app, err := firebase.NewApp(ctx, nil, sa)
 	if err != nil {
 		log.Fatalf("error initializing app: %v\n", err)
 	}
